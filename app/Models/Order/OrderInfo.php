@@ -78,6 +78,6 @@ class OrderInfo extends Model
 
         $serial = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 
-        return "ORD-{$year}-{$month}-{$serial}";
+        return "{$year}{$month}{$serial}";
     }
 }

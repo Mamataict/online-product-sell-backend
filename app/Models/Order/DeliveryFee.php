@@ -12,4 +12,8 @@ class DeliveryFee extends Model
         'effect_date',
         'is_active',
     ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }

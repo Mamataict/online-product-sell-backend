@@ -53,6 +53,7 @@ class ProductCategoryController extends Controller
         try {
             $store_product_category = ProductCategory::create([
                 'name' => $request->name,
+                'view_order' => $request->view_order,
             ]);
 
             return response()->json([
@@ -106,6 +107,7 @@ class ProductCategoryController extends Controller
             }
 
             $product_category->name = $request->name;
+            $product_category->view_order = $request->view_order;
             $product_category->is_active = $request->is_active;
 
             $product_category->save();

@@ -90,7 +90,9 @@ class ProductController extends Controller
             $store_product = ProductInfo::create([
                 'name' => $request->name,
                 'unit' => $request->unit,
+                'instruction' => $request->instruction,
                 'stock' => $request->stock ?? 0,
+                'view_order' => $request->view_order,
                 'product_category_id' => $request->product_category_id,
                 'is_active' => $request->is_active,
             ]);
@@ -166,7 +168,9 @@ class ProductController extends Controller
 
             $product->name = $request->name;
             $product->unit = $request->unit;
+            $product->instruction = $request->instruction;
             $product->stock = $request->stock ?? 0;
+            $product->view_order = $request->view_order;
             $product->product_category_id = $request->product_category_id;
             $product->is_active = $request->is_active;
 

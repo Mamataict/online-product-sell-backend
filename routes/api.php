@@ -34,6 +34,8 @@ Route::get('/home', [FrontendController::class, 'index'])->name('dashboard.info'
 
 Route::post('/order/confirm', [OrderController::class, 'orderConfirm'])->name('order.confirm');
 
+Route::get('/order/{id}/info', [OrderController::class, 'orderDetails'])->name('order.order_details');
+
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('/users', UserController::class);
@@ -114,7 +116,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/create', [OrderController::class, 'create'])->name('order.create');
         Route::get('/products', [OrderController::class, 'getProductsBySearch'])->name('order.products');
         Route::get('{id}/details', [OrderController::class, 'details'])->name('order.details');
-        Route::get('{id}/info', [OrderController::class, 'orderDetails'])->name('order.order_details');
+        
         Route::put('{id}/status', [OrderController::class, 'orderStatus'])->name('order.status.change');
         Route::put('{id}/remark', [OrderController::class, 'orderRemark'])->name('order.remark.update');
         Route::put('{id}/cancel', [OrderController::class, 'cancelOrder'])->name('order.cancel');

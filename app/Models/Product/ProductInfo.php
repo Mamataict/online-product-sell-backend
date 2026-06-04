@@ -15,14 +15,17 @@ class ProductInfo extends Model
         'name',
         'unit',
         'stock',
+        'instruction',
         'image',
         'product_category_id',
+        'view_order',
         'is_active',
     ];
 
     protected $appends = ['image_url'];
 
     protected $casts = [
+        'view_order' => 'integer',
         'is_active' => 'boolean',
     ];
 

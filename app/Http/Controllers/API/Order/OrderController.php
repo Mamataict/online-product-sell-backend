@@ -307,8 +307,6 @@ class OrderController extends Controller
     {
         try {
 
-            $products = $this->available_products();
-
             $not_available = '';
 
             foreach ($request->products as $ordered_product) {

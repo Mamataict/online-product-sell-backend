@@ -8,10 +8,12 @@ class ProductCategory extends Model
 {
     protected $fillable = [
         'name',
+        'view_order',
         'is_active',
     ];
 
     protected $casts = [
+        'view_order' => 'integer',
         'is_active' => 'boolean',
     ];
 

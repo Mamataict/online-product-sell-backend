@@ -29,7 +29,13 @@ class FrontendController extends Controller
     {
         try {
 
-            $products = $this->available_products();
+            $product_categories = $this->available_products();
+
+            $products = $product_categories->flatMap->products->values();
+
+            $products_view = $product_categories->flatMap(function ($category) {
+                return $category->products->take(1);
+            })->values();
 
             $delivery_fee = DeliveryFee::where('is_active', 1)->whereDate('effect_date', '<=', Carbon::today())->get();
 
@@ -37,6 +43,7 @@ class FrontendController extends Controller
                 'status' => true,
                 'message' => 'Data retrieved successfully.',
                 'data' => [
+                    'products_view' => $products_view,
                     'products' => $products,
                     'delivery_fee' => $delivery_fee,
                 ],
