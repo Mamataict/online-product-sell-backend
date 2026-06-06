@@ -307,69 +307,49 @@ class OrderController extends Controller
     {
         try {
 
-            $not_available = '';
+            $order_id = OrderInfo::generateOrderId();
 
-            foreach ($request->products as $ordered_product) {
+            $customer = Customer::create(
+                [
+                    'name' => $request->customer['name'],
+                    'phone' => $request->customer['phone'],
+                    'address' => $request->customer['address'],
+                ]
+            );
 
-                $not_available = ProductInfo::find($ordered_product['product_id'])->complete_orders()->sum('qty') + $ordered_product['qty'] > ProductInfo::find($ordered_product['product_id'])->stock ? ProductInfo::find($ordered_product['product_id'])->name . ' (' . ProductInfo::find($ordered_product['product_id'])->unit . ')' : null;
+            $order_info = OrderInfo::create([
+                'order_info_id' => $order_id,
+                'customer_id' => $customer->id,
+                'delivery_fee' => $request->shipping_cost,
+                'status' => 1,
+                'place_date' => Carbon::now()->format('Y-m-d'),
+            ]);
 
-                if (!empty($not_available)) {
-                    break;
-                }
+            $sub_total = 0;
+
+            foreach ($request->products as $product) {
+
+                $product_price = ProductInfo::find($product['product_id'])->latest_price->price;
+                OrderDetails::create([
+                    'order_id' => $order_info->id,
+                    'product_info_id' => $product['product_id'],
+                    'qty' => $product['qty'],
+                    'price' => $product_price,
+                ]);
+
+                $sub_total += $product_price * $product['qty'];
             }
 
-            if (!empty($not_available)) {
-                return response()->json([
-                    'status' => false,
-                    'message' => $not_available . ' `s quantity is not available',
-                    'data' => [],
-                ]);
-            } else {
+            $order_info->subtotal = $sub_total;
+            $order_info->grand_total = $sub_total + $request->shipping_cost;
+            $order_info->save();
 
-                $order_id = OrderInfo::generateOrderId();
-
-                $customer = Customer::create(
-                    [
-                        'name' => $request->customer['name'],
-                        'phone' => $request->customer['phone'],
-                        'address' => $request->customer['address'],
-                    ]
-                );
-
-                $order_info = OrderInfo::create([
-                    'order_info_id' => $order_id,
-                    'customer_id' => $customer->id,
-                    'delivery_fee' => $request->shipping_cost,
-                    'status' => 1,
-                    'place_date' => Carbon::now()->format('Y-m-d'),
-                ]);
-
-                $sub_total = 0;
-
-                foreach ($request->products as $product) {
-
-                    $product_price = ProductInfo::find($product['product_id'])->latest_price->price;
-                    OrderDetails::create([
-                        'order_id' => $order_info->id,
-                        'product_info_id' => $product['product_id'],
-                        'qty' => $product['qty'],
-                        'price' => $product_price,
-                    ]);
-
-                    $sub_total += $product_price * $product['qty'];
-                }
-
-                $order_info->subtotal = $sub_total;
-                $order_info->grand_total = $sub_total + $request->shipping_cost;
-                $order_info->save();
-
-                return response()->json([
-                    'status' => true,
-                    'route' => $order_info->order_info_id,
-                    'message' => 'অর্ডারটি সম্পন্ন হয়েছে, আমরা আপনার সাথে যোগাযোগ করবো খুব শীঘ্রই',
-                    'data' => [],
-                ]);
-            }
+            return response()->json([
+                'status' => true,
+                'route' => $order_info->order_info_id,
+                'message' => 'অর্ডারটি সম্পন্ন হয়েছে, আমরা আপনার সাথে যোগাযোগ করবো খুব শীঘ্রই',
+                'data' => [],
+            ]);
         } catch (Exception $e) {
             return response()->json([
                 'status' => $e->getMessage(),
@@ -377,7 +357,8 @@ class OrderController extends Controller
         }
     }
 
-    public function orderStatus($id){
+    public function orderStatus($id)
+    {
         try {
 
             $order = OrderInfo::find($id);
@@ -399,7 +380,8 @@ class OrderController extends Controller
             ], 500);
         }
     }
-    public function orderRemark($id){
+    public function orderRemark($id)
+    {
         try {
 
             $order = OrderInfo::find($id);
@@ -484,39 +466,39 @@ class OrderController extends Controller
 
     public function campaignStore(Request $request)
     {
-        try {
-            $order_info = OrderInfo::find($request->order_id_cus);
+        // try {
+        //     $order_info = OrderInfo::find($request->order_id_cus);
 
-            if (!empty($request->campaign_id) && !empty($request->order_id_cus) && $order_info->payment_status == 'pending') {
-                $campaign_details = CampaignDetails::where('id', $request->campaign_id)->whereDate('effect_date', '<=', now())->where('is_active', 1)->first();
+        //     if (!empty($request->campaign_id) && !empty($request->order_id_cus) && $order_info->payment_status == 'pending') {
+        //         $campaign_details = CampaignDetails::where('id', $request->campaign_id)->whereDate('effect_date', '<=', now())->where('is_active', 1)->first();
 
-                if ($campaign_details->discount_type == 'percentage') {
-                    $payable_price = ((100 - $campaign_details->discount) * $order_info->payable_price) / 100;
-                } else if ($campaign_details->discount_type == 'fixed') {
-                    $payable_price = $order_info->payable_price - $campaign_details->discount;
-                }
+        //         if ($campaign_details->discount_type == 'percentage') {
+        //             $payable_price = ((100 - $campaign_details->discount) * $order_info->payable_price) / 100;
+        //         } else if ($campaign_details->discount_type == 'fixed') {
+        //             $payable_price = $order_info->payable_price - $campaign_details->discount;
+        //         }
 
-                $order_info->payable_price = $payable_price;
+        //         $order_info->payable_price = $payable_price;
 
-                $order_info->init_pay = $payable_price;
+        //         $order_info->init_pay = $payable_price;
 
-                $order_info->campaign_details_id = $campaign_details->id;
-                $order_info->save();
+        //         $order_info->campaign_details_id = $campaign_details->id;
+        //         $order_info->save();
 
-                $order = OrderInfo::with(['orders.productPrice.product', 'campaign.campaign', 'branch', 'customer', 'seller', 'payment_via'])
-                    ->find($order_info->id);
+        //         $order = OrderInfo::with(['orders.productPrice.product', 'campaign.campaign', 'branch', 'customer', 'seller', 'payment_via'])
+        //             ->find($order_info->id);
 
-                return response()->json([
-                    'status' => true,
-                    'message' => 'Data retrieved successfully.',
-                    'data' => $order,
-                ]);
-            }
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'Something went wrong',
-            ], 500);
-        }
+        //         return response()->json([
+        //             'status' => true,
+        //             'message' => 'Data retrieved successfully.',
+        //             'data' => $order,
+        //         ]);
+        //     }
+        // } catch (Exception $e) {
+        //     return response()->json([
+        //         'status' => 'Something went wrong',
+        //     ], 500);
+        // }
     }
 
     public function campaignRemove(Request $request)

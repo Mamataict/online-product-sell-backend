@@ -26,19 +26,19 @@ trait ProductInfoCheck
             ->orderBy('view_order', 'asc')
             ->get();
 
-        $product_categories->each(function ($category) {
-            $category->products = $category->products
-                ->filter(function ($product) {
-                    $complete_orders_qty = $product->complete_orders->sum('qty');
-                    return $product->stock > $complete_orders_qty;
-                })
-                ->values()
-                ->map(function ($product) {
-                    $complete_orders_qty = $product->complete_orders->sum('qty');
-                    $product->available_qty = $product->stock - $complete_orders_qty;
-                    return $product;
-                });
-        });
+        // $product_categories->each(function ($category) {
+        //     $category->products = $category->products
+        //         ->filter(function ($product) {
+        //             $complete_orders_qty = $product->complete_orders->sum('qty');
+        //             return $product->stock > $complete_orders_qty;
+        //         })
+        //         ->values()
+        //         ->map(function ($product) {
+        //             $complete_orders_qty = $product->complete_orders->sum('qty');
+        //             $product->available_qty = $product->stock - $complete_orders_qty;
+        //             return $product;
+        //         });
+        // });
 
         
 

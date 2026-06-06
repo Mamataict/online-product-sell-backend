@@ -91,7 +91,6 @@ class ProductController extends Controller
                 'name' => $request->name,
                 'unit' => $request->unit,
                 'instruction' => $request->instruction,
-                'stock' => $request->stock ?? 0,
                 'view_order' => $request->view_order,
                 'product_category_id' => $request->product_category_id,
                 'is_active' => $request->is_active,
@@ -137,10 +136,6 @@ class ProductController extends Controller
             $product_categories = ProductCategory::active()->get();
             $product = ProductInfo::with(['category', 'prices'])->find($id);
 
-            $complete_orders_qty = $product->complete_orders->sum('qty');
-
-            $product->available_qty = $product->stock - $complete_orders_qty;
-
             return response()->json([
                 'status' => true,
                 'message' => 'Info retrieved successfully.',
@@ -169,7 +164,6 @@ class ProductController extends Controller
             $product->name = $request->name;
             $product->unit = $request->unit;
             $product->instruction = $request->instruction;
-            $product->stock = $request->stock ?? 0;
             $product->view_order = $request->view_order;
             $product->product_category_id = $request->product_category_id;
             $product->is_active = $request->is_active;
