@@ -25,7 +25,6 @@ class StoreProductRequest extends FormRequest
             'name' => 'required|string|max:255',
             'unit' => 'required|string|max:50',
             'instruction' => 'nullable|string|max:10000',
-            'stock' => 'required|integer|min:0',
             'view_order' => 'nullable|integer|min:0',
             'product_category_id' => 'required|exists:product_categories,id',
             'image' => 'required|image|mimes:jpeg,png,jpg,svg|max:200',
