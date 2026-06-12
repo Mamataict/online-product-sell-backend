@@ -33,13 +33,18 @@ class OrderInfo extends Model
 
     public function getStatusTextAttribute()
     {
-        return match ($this->status) {
-            1 => 'Pending',
-            2 => 'Confirmed',
-            3 => 'Delivered',
-            4 => 'Cancelled',
-            default => 'Unknown',
-        };
+        switch ($this->status) {
+            case 1:
+                return 'Pending';
+            case 2:
+                return 'Confirmed';
+            case 3:
+                return 'Delivered';
+            case 4:
+                return 'Cancelled';
+            default:
+                return 'Unknown';
+        }
     }
 
     public function scopeActive($query)
