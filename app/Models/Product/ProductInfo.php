@@ -19,6 +19,7 @@ class ProductInfo extends Model
         'image',
         'product_category_id',
         'view_order',
+        'special_delivery',
         'is_active',
     ];
 

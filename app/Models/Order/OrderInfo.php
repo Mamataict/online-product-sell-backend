@@ -18,6 +18,7 @@ class OrderInfo extends Model
         'grand_total',
         'delivery_fee',
         'status',
+        'payment_status',
         'place_date',
         'handler_id',
         'remark',
@@ -29,7 +30,7 @@ class OrderInfo extends Model
     ];
 
 
-    protected $appends = ['status_text'];
+    protected $appends = ['status_text', 'payment_status_text'];
 
     public function getStatusTextAttribute()
     {
@@ -42,6 +43,18 @@ class OrderInfo extends Model
                 return 'Delivered';
             case 4:
                 return 'Cancelled';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    public function getPaymentStatusTextAttribute()
+    {
+        switch ($this->payment_status) {
+            case 1:
+                return 'Due';
+            case 2:
+                return 'Paid';
             default:
                 return 'Unknown';
         }

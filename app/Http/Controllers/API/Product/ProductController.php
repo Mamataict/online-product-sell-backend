@@ -94,6 +94,7 @@ class ProductController extends Controller
                 'view_order' => $request->view_order,
                 'product_category_id' => $request->product_category_id,
                 'is_active' => $request->is_active,
+                'special_delivery' => $request->is_sepial_delivery
             ]);
 
             if ($request->hasFile('image')) {
@@ -167,6 +168,7 @@ class ProductController extends Controller
             $product->view_order = $request->view_order;
             $product->product_category_id = $request->product_category_id;
             $product->is_active = $request->is_active;
+            $product->special_delivery = $request->is_sepial_delivery;
 
             if ($request->hasFile('image')) {
                 if ($product->image && Storage::disk('public')->exists('images/product/' . $product->image)) {

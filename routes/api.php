@@ -26,6 +26,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 
+// Route::options('{any}', function () {
+//     return response()->json([], 200);
+// })->where('any', '.*');
+
 Route::middleware('login_attempt')->post('/login', [AuthController::class, 'login']);
 Route::middleware('login_attempt')->post('/register', [AuthController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
@@ -118,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{id}/details', [OrderController::class, 'details'])->name('order.details');
         
         Route::put('{id}/status', [OrderController::class, 'orderStatus'])->name('order.status.change');
+        Route::put('{id}/payment/status', [OrderController::class, 'orderPaymentStatus'])->name('order.payment.status.change');
         Route::put('{id}/remark', [OrderController::class, 'orderRemark'])->name('order.remark.update');
         Route::put('{id}/cancel', [OrderController::class, 'cancelOrder'])->name('order.cancel');
         Route::get('/product', [OrderController::class, 'soldProduct'])->name('product.sale.info');

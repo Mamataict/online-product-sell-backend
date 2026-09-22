@@ -72,7 +72,10 @@ class OrderController extends Controller
                 })
 
                 ->when($request->filled('order_status'), function ($query) use ($request) {
-                    $query->where('status', 'like', "%{$request->order_status}%");
+                    $query->where('status', $request->order_status);
+                })
+                ->when($request->filled('order_payment_status'), function ($query) use ($request) {
+                    $query->where('status', $request->order_status);
                 })
 
                 ->orderByDesc('created_at')
@@ -322,6 +325,7 @@ class OrderController extends Controller
                 'customer_id' => $customer->id,
                 'delivery_fee' => $request->shipping_cost,
                 'status' => 1,
+                'payment_status' => 1,
                 'place_date' => Carbon::now()->format('Y-m-d'),
             ]);
 
@@ -364,9 +368,30 @@ class OrderController extends Controller
             $order = OrderInfo::find($id);
 
             $order->status = request('status');
-            $order->remark = request('remark');
+
             $order->handler_id = Auth::guard('api')->id();
 
+            $order->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Order status changed successfully.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong',
+            ], 500);
+        }
+    }
+    public function orderPaymentStatus($id)
+    {
+        try {
+
+            $order = OrderInfo::find($id);
+
+            $order->payment_status = request('payment_status');
+            $order->handler_id = Auth::guard('api')->id();
             $order->save();
 
             return response()->json([
@@ -747,7 +772,24 @@ class OrderController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        try {
+
+            $order = OrderInfo::findOrFail($id);
+
+            if ($order) {
+                $order->delete();
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Order removed successfully.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
+            ], 500);
+        }
     }
 
     public function cancelOrder($id)
