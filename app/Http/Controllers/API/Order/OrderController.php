@@ -52,7 +52,7 @@ class OrderController extends Controller
 
             $request = request();
 
-            $orders = OrderInfo::with('customer', 'handler', 'remarker')
+            $orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
 
                 ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
                     $query->whereBetween('place_date', [
@@ -75,7 +75,7 @@ class OrderController extends Controller
                     $query->where('status', $request->order_status);
                 })
                 ->when($request->filled('order_payment_status'), function ($query) use ($request) {
-                    $query->where('status', $request->order_status);
+                    $query->where('payment_status', $request->order_payment_status);
                 })
 
                 ->orderByDesc('created_at')
@@ -356,7 +356,7 @@ class OrderController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
