@@ -85,10 +85,8 @@ class OrderController extends Controller
             $orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
 
                 ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
-                    $query->whereBetween('place_date', [
-                        $request->start_date,
-                        $request->end_date,
-                    ]);
+                    $query->whereDate('place_date', '>=', $request->start_date)
+                            ->whereDate('place_date', '<=', $request->end_date);
                 })
 
                 ->when($request->filled('order_id'), function ($query) use ($request) {
@@ -973,13 +971,9 @@ class OrderController extends Controller
                         request()->filled('end_date'),
 
                     function ($q) {
-
                         $q->whereHas('order_info', function ($q2) {
-
-                            $q2->whereBetween('place_date', [
-                                request('start_date'),
-                                request('end_date'),
-                            ]);
+                            $q2->whereDate('place_date', '>=', request('start_date'))
+                                ->whereDate('place_date', '<=', request('end_date'));
                         });
                     }
                 )->get();
@@ -1002,11 +996,8 @@ class OrderController extends Controller
                     function ($q) {
 
                         $q->whereHas('order_info', function ($q2) {
-
-                            $q2->whereBetween('place_date', [
-                                request('start_date'),
-                                request('end_date'),
-                            ]);
+                            $q2->whereDate('place_date', '>=', request('start_date'))
+                                ->whereDate('place_date', '<=', request('end_date'));
                         });
                     }
                 )

@@ -65,10 +65,8 @@ class ReportController extends Controller
                     request()->filled('end_date'),
                 function ($q) {
                     $q->whereHas('order_info', function ($q2) {
-                        $q2->whereBetween('place_date', [
-                            request('start_date'),
-                            request('end_date'),
-                        ]);
+                        $q2->whereDate('place_date', '>=', request('start_date'))
+                            ->whereDate('place_date', '<=', request('end_date'));
                     });
                 }
             )->latest()->get();
