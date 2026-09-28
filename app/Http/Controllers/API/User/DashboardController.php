@@ -19,7 +19,8 @@ class DashboardController extends Controller
         $total_confirmed = OrderInfo::where('status', 2)->count();
         $total_delivered = OrderInfo::where('status', 3)->count();
         $total_cancelled = OrderInfo::where('status', 4)->count();
-        $total_paid = OrderInfo::whereIn('status', [2, 3])->sum('grand_total');
+        // $total_paid = OrderInfo::whereIn('status', [2, 3])->where('payment_status', 2)->sum('grand_total');
+        // $total_due = OrderInfo::whereIn('status', [2, 3])->where('payment_status', 1)->sum('grand_total');
     
         try {
             return response()->json([
@@ -31,7 +32,8 @@ class DashboardController extends Controller
                     'total_confirmed' => $total_confirmed,
                     'total_delivered' => $total_delivered,
                     'total_cancelled' => $total_cancelled,
-                    'total_paid' => $total_paid,
+                    // 'total_paid' => $total_paid,
+                    // 'total_due' => $total_due,
                 ],
             ]);
         } catch (\Exception $e) {

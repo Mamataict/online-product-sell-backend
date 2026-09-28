@@ -34,30 +34,12 @@ class OrderInfo extends Model
 
     public function getStatusTextAttribute()
     {
-        switch ($this->status) {
-            case 1:
-                return 'Pending';
-            case 2:
-                return 'Confirmed';
-            case 3:
-                return 'Delivered';
-            case 4:
-                return 'Cancelled';
-            default:
-                return 'Unknown';
-        }
+        return orderStatus($this->status);
     }
 
     public function getPaymentStatusTextAttribute()
     {
-        switch ($this->payment_status) {
-            case 1:
-                return 'Due';
-            case 2:
-                return 'Paid';
-            default:
-                return 'Unknown';
-        }
+        return orderPaymentStatus($this->payment_status);
     }
 
     public function scopeActive($query)

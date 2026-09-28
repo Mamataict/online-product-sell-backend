@@ -79,6 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('product_category', ProductCategoryController::class);
 
     Route::prefix('product')->group(function () {
+        Route::get('/search', [ProductController::class, 'getSearchProduct'])->name('product.search');
         Route::get('/create', [ProductController::class, 'create'])->name('product.create');
         Route::put('/{id}/activation', [ProductController::class, 'activation'])->name('product.activation');
     });

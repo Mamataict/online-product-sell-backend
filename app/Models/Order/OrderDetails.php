@@ -4,6 +4,7 @@ namespace App\Models\Order;
 
 use App\Models\Product\ProductInfo;
 use App\Models\Product\ProductPrices;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderDetails extends Model
@@ -18,6 +19,8 @@ class OrderDetails extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    protected $appends = ['total_item_price'];
 
     public function scopeActive($query)
     {
@@ -36,5 +39,12 @@ class OrderDetails extends Model
     public function adjustment()
     {
         return $this->hasOne(Adjustment::class, 'order_details_id');
+    }
+
+    protected function totalItemPrice(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => ($this->price ?? 0) * ($this->qty ?? 0),
+        );
     }
 }

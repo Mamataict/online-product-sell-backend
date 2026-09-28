@@ -39,3 +39,35 @@ if (! function_exists('discountedPrice')) {
         return $discountedPrice;
     }
 }
+
+if (! function_exists('orderStatus')) {
+    function orderStatus(int $order_status)
+    {
+        switch ($order_status) {
+            case 1:
+                return 'Pending';
+            case 2:
+                return 'Confirmed';
+            case 3:
+                return 'Delivered';
+            case 4:
+                return 'Cancelled';
+            default:
+                return 'Unknown';
+        }
+    }
+}
+
+if (! function_exists('paymentStatus')) {
+    function orderPaymentStatus(int $payment_status)
+    {
+        switch ($payment_status) {
+            case 1:
+                return 'Due';
+            case 2:
+                return 'Paid';
+            default:
+                return 'Unknown';
+        }
+    }
+}

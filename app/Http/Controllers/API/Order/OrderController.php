@@ -52,6 +52,36 @@ class OrderController extends Controller
 
             $request = request();
 
+            $total_amount = 0;
+
+            $calculate_orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
+
+                ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
+                    $query->whereBetween('place_date', [
+                        $request->start_date,
+                        $request->end_date,
+                    ]);
+                })
+
+                ->when($request->filled('order_id'), function ($query) use ($request) {
+                    $query->where('order_info_id', 'like', "%{$request->order_id}%");
+                })
+
+                ->when($request->filled('cus_phone'), function ($query) use ($request) {
+                    $query->whereHas('customer', function ($q) use ($request) {
+                        $q->where('phone', 'like', "%{$request->cus_phone}%");
+                    });
+                })
+
+                ->when($request->filled('order_status'), function ($query) use ($request) {
+                    $query->where('status', $request->order_status);
+                })
+                ->when($request->filled('order_payment_status'), function ($query) use ($request) {
+                    $query->where('payment_status', $request->order_payment_status);
+                })->get();
+
+            $total_amount = $calculate_orders->sum('grand_total');
+
             $orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
 
                 ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
@@ -80,7 +110,7 @@ class OrderController extends Controller
 
                 ->orderByDesc('created_at')
 
-                ->paginate();
+                ->paginate(20);
 
             return response()->json([
                 'status' => true,
@@ -88,6 +118,7 @@ class OrderController extends Controller
                 'data' =>
                 [
                     'orders' => $orders,
+                    'total_amount' => $total_amount
                 ],
             ]);
         } catch (Exception $e) {
@@ -930,19 +961,39 @@ class OrderController extends Controller
     public function soldProduct()
     {
         try {
-            $products = OrderDetails::with(['productPrice.product', 'order_info.branch', 'order_info.customer', 'order_info.seller'])
-                ->whereHas('order_info', function ($query) {
-                    $query->where('payment_status', 'completed');
-                })
-                ->when(request()->filled('search'), function ($query) {
-                    $query->whereHas('order_info', function ($q) {
-                        $q->where('invoice', 'like', '%' . request('search') . '%');
-                    });
+            $all_products = OrderDetails::with(['product', 'order_info', 'order_info.customer', 'order_info.handler'])
+                ->whereHas('order_info', function ($q) {
+                    $q->where('status', 2);
                 })
                 ->when(request()->filled('product_id'), function ($query) {
-                    $query->whereHas('productPrice', function ($q) {
-                        $q->where('product_info_id', request('product_id'));
-                    });
+                    $query->where('product_info_id', request('product_id'));
+                })
+                ->when(
+                    request()->filled('start_date') &&
+                        request()->filled('end_date'),
+
+                    function ($q) {
+
+                        $q->whereHas('order_info', function ($q2) {
+
+                            $q2->whereBetween('place_date', [
+                                request('start_date'),
+                                request('end_date'),
+                            ]);
+                        });
+                    }
+                )->get();
+
+            $total_qty = $all_products->sum('qty');
+
+            $total_price = $all_products->sum('total_item_price');
+
+            $products = OrderDetails::with(['product', 'order_info', 'order_info.customer', 'order_info.handler'])
+                ->whereHas('order_info', function ($q) {
+                    $q->where('status', 2);
+                })
+                ->when(request()->filled('product_id'), function ($query) {
+                    $query->where('product_info_id', request('product_id'));
                 })
                 ->when(
                     request()->filled('start_date') &&
@@ -962,21 +1013,22 @@ class OrderController extends Controller
                 ->latest()
                 ->paginate(10);
 
-            $product_categories = ProductCategory::has('products.prices.orders')->where('is_active', 1)->get();
+            $product_categories = ProductCategory::has('products.orders')->where('is_active', 1)->get();
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data retrieved successfully.',
                 'data' =>
                 [
+                    'total_qty' => $total_qty,
+                    'total_price' => $total_price,
                     'products' => $products,
                     'product_categories' => $product_categories
                 ]
-
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => 'Something went wrong!',
+                'status' => $e->getMessage(),
             ], 500);
         }
     }

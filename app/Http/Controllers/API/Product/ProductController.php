@@ -61,6 +61,27 @@ class ProductController extends Controller
         }
     }
 
+    public function getSearchProduct(): JsonResponse
+    {
+        try {
+            $products = ProductInfo::when(request('search'), function ($query) {
+                    $query->where('name', 'like', '%' . request('search') . '%');
+                })
+                ->get();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data retrieved successfully.',
+                'data' => $products,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong!',
+            ], 500);
+        }
+    }
+
     public function create(): JsonResponse
     {
         try {
