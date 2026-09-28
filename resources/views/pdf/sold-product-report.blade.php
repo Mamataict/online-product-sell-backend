@@ -368,7 +368,6 @@
                 <th>SL.</th>
                 <th>Date</th>
                 <th>Invoice</th>
-                <th>Status</th>
                 <th>Payment Status</th>
                 <th>Customer</th>
                 <th>Qty</th>
@@ -402,12 +401,6 @@
                         {{-- Invoice --}}
                         <td>
                             {{ $product->order_info?->order_info_id }}
-                        </td>
-
-
-                        {{-- Status --}}
-                        <td>
-                            {{ $product->order_info?->status_text }}
                         </td>
 
 
