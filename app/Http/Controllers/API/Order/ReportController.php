@@ -8,6 +8,10 @@ use App\Models\Product\ProductInfo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Mpdf\Config\ConfigVariables;
+use Mpdf\Config\FontVariables;
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 
 class ReportController extends Controller
 {
@@ -82,12 +86,53 @@ class ReportController extends Controller
             ? ProductInfo::find(request('product_id'))
             : null;
 
-        $pdf = Pdf::loadView('pdf.sold-product-report', compact('products', 'total_qty', 'total_price', 'start_date', 'end_date', 'product_info'))
-            ->setPaper([0, 0, 380, 600]);
+        // using mpdf
+        $html = view('pdf.sold-product-report', compact('products', 'total_qty', 'total_price', 'start_date', 'end_date', 'product_info'))->render();
 
-        return response($pdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="sold-product-report.pdf"',
+        $tempDir = public_path('assets/fonts');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $fontDirs = (new ConfigVariables())->getDefaults()['fontDir'];
+        $fontData = (new FontVariables())->getDefaults()['fontdata'];
+
+        $solaiman = [
+            'R'      => 'SolaimanLipi.ttf',
+            'useOTL' => 0xFF, // required for Bengali shaping
+        ];
+
+        // Only if you added the bold file
+        if (file_exists(public_path('assets/fonts/SolaimanLipi_Bold.ttf'))) {
+            $solaiman['B'] = 'SolaimanLipi_Bold.ttf';
+        }
+
+        $mpdf = new Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+            'tempDir'      => $tempDir,
+            'fontDir'      => array_merge($fontDirs, [public_path('assets/fonts')]),
+            'fontdata'     => $fontData + ['solaimanlipi' => $solaiman],
+            'default_font' => 'solaimanlipi',
         ]);
+
+        $mpdf->WriteHTML($html);
+
+        $content = $mpdf->Output('', Destination::STRING_RETURN);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="product_sale_report.pdf"',
+            'Content-Length'      => strlen($content),
+        ]);
+        // using mpdf
+
+        // $pdf = Pdf::loadView('pdf.sold-product-report', compact('products', 'total_qty', 'total_price', 'start_date', 'end_date', 'product_info'))
+        //     ->setPaper([0, 0, 380, 600]);
+
+        // return response($pdf->output(), 200, [
+        //     'Content-Type' => 'application/pdf',
+        //     'Content-Disposition' => 'inline; filename="sold-product-report.pdf"',
+        // ]);
     }
 }
