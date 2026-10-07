@@ -54,7 +54,7 @@ class DeliveryFeeController extends Controller
         try {
             DeliveryFee::create([
                 'info' => $request->info,
-                'delivery_charge' => $request->delivery_charge,
+                'delivery_charge' => round($request->delivery_charge, 2),
                 'effect_date' => $request->effect_date,
                 'is_active' => $request->is_active,
             ]);
@@ -103,7 +103,7 @@ class DeliveryFeeController extends Controller
             $delivery_fee = DeliveryFee::find($id);
 
             $delivery_fee->info = $request->info;
-            $delivery_fee->delivery_charge = $request->delivery_charge;
+            $delivery_fee->delivery_charge = round($request->delivery_charge, 2);
             $delivery_fee->effect_date = $request->effect_date;
             $delivery_fee->is_active = $request->is_active;
             $delivery_fee->save();

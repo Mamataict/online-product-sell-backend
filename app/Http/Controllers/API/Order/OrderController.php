@@ -373,8 +373,8 @@ class OrderController extends Controller
                 $sub_total += $product_price * $product['qty'];
             }
 
-            $order_info->subtotal = $sub_total;
-            $order_info->grand_total = $sub_total + $request->shipping_cost;
+            $order_info->subtotal = round($sub_total);
+            $order_info->grand_total = round($sub_total) + $request->shipping_cost;
             $order_info->save();
 
             return response()->json([
@@ -669,23 +669,18 @@ class OrderController extends Controller
     {
         $order_info = OrderInfo::find($order_id);
 
-        $grand_total = 0;
+        $subtotal = 0;
 
         foreach ($order_info->orders as $order) {
-            $grand_total += $order->price;
+            $subtotal += $order->total_item_price;
         }
 
-        if (!empty($order_info->campaign_details_id)) {
-            if ($order_info->campaign->discount_type == 'percentage') {
-                $grand_total = ((100 - $order_info->campaign->discount) * $grand_total) / 100;
-            } else if ($order_info->campaign->discount_type == 'fixed') {
-                $grand_total = $grand_total - $order_info->campaign->discount;
-            }
-        }
+        $subtotal = round($subtotal, 2) ;
 
-        $order_info->payable_price = round($grand_total + $order_info->delivery_fee);
+        $grand_total = round($subtotal + $order_info->delivery_fee, 2);
 
-        $order_info->init_pay = $order_info->payable_price;
+        $order_info->subtotal = $subtotal;
+        $order_info->grand_total = $grand_total;
 
         $order_info->save();
     }
@@ -1340,4 +1335,89 @@ class OrderController extends Controller
             ], 500);
         }
     }
+
+    public function updateDeliveryFee(Request $request, $id)
+    {
+        try {
+            $order = OrderInfo::find($id);
+
+            if (!empty($order)) {
+                $order->delivery_fee = round($request->delivery_fee, 2);
+                $order->save();
+
+                $this->amountSet($id);
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Delivery fee updated successfully.',
+                    'data' => [],
+                ]);
+            }
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Order not found!',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
+            ], 500);
+        }
+    }
+
+    public function updateItemQty(Request $request)
+    {
+        try {
+            $order_id = null;
+            foreach ($request->items as $item) {
+                $order_details = OrderDetails::find($item['order_item_id']);
+                $order_id = $order_details->order_id;
+                $product_price = ProductInfo::find($order_details->product_info_id)->latest_price->price;
+                if (!empty($order_details)) {
+                    $order_details->qty = $item['quantity'];
+                    $order_details->price = $product_price;
+                    $order_details->save();
+                }
+            }
+
+            if($order_id){
+                $this->amountSet($order_id);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Item quantities updated successfully.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function updateCustomerInfo(Request $request, $id)
+    {
+        try {
+            $customer = Customer::find($id);
+
+            if (!empty($customer)) {
+                $customer->name = $request->name;
+                $customer->phone = $request->phone;
+                $customer->address = $request->address;
+                $customer->save();
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Customer information updated successfully.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => $e->getMessage(),
+            ], 500);
+        }
+    }
+            
 }

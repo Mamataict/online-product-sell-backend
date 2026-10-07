@@ -141,6 +141,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/adjustment', [OrderController::class, 'adjustment'])->name('order.adjustment');
         Route::post('/adjustment_date', [OrderController::class, 'adjustmentDate'])->name('order.adjustment_date');
         Route::get('/discounts', [OrderController::class, 'getDiscountList'])->name('order.discount.list');
+        Route::put('/{id}/delivery-fee', [OrderController::class, 'updateDeliveryFee'])->name('order.delivery.fee.update');
+        Route::put('/item-qty', [OrderController::class, 'updateItemQty'])->name('order.item.qty.update');
+        Route::put('/{id}/customer-info', [OrderController::class, 'updateCustomerInfo'])->name('order.customer.info.update');
+
     });
 
     Route::prefix('report')->group(function () {
