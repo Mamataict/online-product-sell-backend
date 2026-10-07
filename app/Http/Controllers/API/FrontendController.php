@@ -39,6 +39,7 @@ class FrontendController extends Controller
 
             $delivery_fee = DeliveryFee::where('is_active', 1)->whereDate('effect_date', '<=', Carbon::today())->get();
 
+            $bkash = '01896025066';
             return response()->json([
                 'status' => true,
                 'message' => 'Data retrieved successfully.',
@@ -46,6 +47,7 @@ class FrontendController extends Controller
                     'products_view' => $products_view,
                     'products' => $products,
                     'delivery_fee' => $delivery_fee,
+                    'bkash' => $bkash,
                 ],
             ]);
         } catch (Exception $e) {
