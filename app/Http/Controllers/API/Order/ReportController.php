@@ -73,7 +73,7 @@ class ReportController extends Controller
                             ->whereDate('place_date', '<=', request('end_date'));
                     });
                 }
-            )->latest()->get();
+            )->get();
 
         $total_qty = $products->sum('qty');
 
@@ -86,7 +86,6 @@ class ReportController extends Controller
             ? ProductInfo::find(request('product_id'))
             : null;
 
-        // using mpdf
         $html = view('pdf.sold-product-report', compact('products', 'total_qty', 'total_price', 'start_date', 'end_date', 'product_info'))->render();
 
         $tempDir = public_path('assets/fonts');
