@@ -25,7 +25,6 @@ class DuePayRequest extends FormRequest
             'due_paid_amount' => 'required|numeric|min:0',
             'due_paid_date' => 'required|date',
             'remark' => 'nullable|string|max:255',
-            'due_amount' => 'required|numeric|min:0',
             'payment_method' => 'required|string|max:50',
         ];
     }

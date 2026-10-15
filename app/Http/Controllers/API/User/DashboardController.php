@@ -39,7 +39,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Something went wrong!',
             ], 500);
         }
     }

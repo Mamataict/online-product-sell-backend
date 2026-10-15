@@ -23,6 +23,7 @@ class OrderInfo extends Model
         'handler_id',
         'remark',
         'remark_by',
+        'pay_via'
     ];
 
     protected $casts = [
@@ -30,7 +31,11 @@ class OrderInfo extends Model
     ];
 
 
-    protected $appends = ['status_text', 'payment_status_text'];
+    protected $appends = ['status_text', 'payment_status_text', 
+        'due_paid_amount',
+        'total_paid',
+        'due_amount',
+    ];
 
     public function getStatusTextAttribute()
     {
@@ -79,5 +84,28 @@ class OrderInfo extends Model
         $serial = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 
         return "{$year}{$month}{$serial}";
+    }
+
+    public function due_payments()
+    {
+        return $this->hasMany(DuePayment::class);
+    }
+
+    public function getDuePaidAmountAttribute()
+    {
+        return $this->due_payments->sum('due_paid_amount') ?? 0;
+    }
+
+    public function getTotalPaidAttribute()
+    {
+        
+        $total_paid = $this->init_pay + ($this->due_payments->sum('due_paid_amount') ?? 0);
+        return $total_paid;
+
+    }
+
+    public function getDueAmountAttribute()
+    {
+        return $this->grand_total - $this->total_paid;
     }
 }

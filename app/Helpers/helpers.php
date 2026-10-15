@@ -29,11 +29,10 @@ if (! function_exists('discountedPrice')) {
             $total_price += $order->delivery_fee;
 
             if ($order->campaign->discount_type === 'percentage') {
-                $discountedPrice = ( $order->campaign->discount * $total_price) / 100;
+                $discountedPrice = ($order->campaign->discount * $total_price) / 100;
             } else {
                 $discountedPrice = $order->campaign->discount;
             }
-
         }
 
         return $discountedPrice;
@@ -69,5 +68,25 @@ if (! function_exists('paymentStatus')) {
             default:
                 return 'Unknown';
         }
+    }
+}
+
+if (! function_exists('paymentVia')) {
+    function paymentVia()
+    {
+        return [
+            'bkash-01627962866',
+            'cash'
+        ];
+    }
+}
+
+if (! function_exists('paymentViaType')) {
+    function paymentViaType()
+    {
+        return [
+            'mfs',
+            'cash'
+        ];
     }
 }

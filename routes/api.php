@@ -138,19 +138,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/place', [OrderController::class, 'orderPlace'])->name('order.place');
         Route::get('/due/invoice/{id}', [OrderController::class, 'dueInvoice'])->name('order.due.invoice');
         Route::put('/due/pay/{id}', [OrderController::class, 'duePay'])->name('order.due.pay');
+        Route::get('/due/payment/{id}/edit', [OrderController::class, 'duePayEdit'])->name('due.pay.edit');
+        Route::put('/due/payment/update/{id}', [OrderController::class, 'duePayUpdate'])->name('due.pay.update');
+        Route::delete('/due/payment/delete/{id}', [OrderController::class, 'duePayDestroy'])->name('due.pay.delete');
         Route::post('/adjustment', [OrderController::class, 'adjustment'])->name('order.adjustment');
         Route::post('/adjustment_date', [OrderController::class, 'adjustmentDate'])->name('order.adjustment_date');
         Route::get('/discounts', [OrderController::class, 'getDiscountList'])->name('order.discount.list');
         Route::put('/{id}/delivery-fee', [OrderController::class, 'updateDeliveryFee'])->name('order.delivery.fee.update');
         Route::put('/item-qty', [OrderController::class, 'updateItemQty'])->name('order.item.qty.update');
         Route::put('/{id}/customer-info', [OrderController::class, 'updateCustomerInfo'])->name('order.customer.info.update');
+        Route::put('/{id}/advance/payment', [OrderController::class, 'saveAdvPay'])->name('order.save.payment');
 
     });
 
     Route::prefix('report')->group(function () {
         Route::get('/due', [OrderController::class, 'dueReport'])->name('order.due.report');
         Route::get('/sale/invoice/{order}', [OrderController::class, 'saleInvoiceReport'])->name('order.invoice.report');
+        Route::get('/sales', [ReportController::class, 'salesReport'])->name('sales.report');
         Route::get('/due/print/{order}', [OrderController::class, 'dueReportPrint'])->name('due.report.print');
+        Route::get('/orders/due/print', [OrderController::class, 'ordersDueReportPrint'])->name('orders.due.report.print');
         Route::get('/discount/print/{order}', [OrderController::class, 'discountReportPrint'])->name('discount.report.print');
         Route::get('/sold/product/invoice', [ReportController::class, 'soldProductInvoice'])->name('sold.product.invoice');
     });

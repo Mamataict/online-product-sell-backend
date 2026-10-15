@@ -28,6 +28,10 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
+use Mpdf\Config\ConfigVariables;
+use Mpdf\Config\FontVariables;
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 
 use function Symfony\Component\Clock\now;
 
@@ -52,58 +56,98 @@ class OrderController extends Controller
 
             $request = request();
 
-            $total_amount = 0;
+            $total_paid = 0;
+            $total_due = 0;
 
-            $calculate_orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
-
-                ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
-                    $query->whereBetween('place_date', [
-                        $request->start_date,
-                        $request->end_date,
-                    ]);
-                })
-
+            $calculate_orders = OrderInfo::with([
+                'orders.product',
+                'customer',
+                'handler',
+                'remarker',
+                'due_payments' => function ($query) {
+                    $query->whereDate('due_paid_date', '<=', request('end_date'));
+                },
+            ])
+                ->when(
+                    $request->filled(['start_date', 'end_date']),
+                    function ($query) use ($request) {
+                        $query->where(function ($q) use ($request) {
+                            $q->whereBetween('place_date', [
+                                $request->start_date,
+                                $request->end_date,
+                            ])
+                                ->orWhereHas('due_payments', function ($dueQuery) use ($request) {
+                                    $dueQuery->whereDate(
+                                        'due_paid_date',
+                                        '>=',
+                                        $request->start_date
+                                    )
+                                        ->whereDate(
+                                            'due_paid_date',
+                                            '<=',
+                                            $request->end_date
+                                        );
+                                });
+                        });
+                    }
+                )
                 ->when($request->filled('order_id'), function ($query) use ($request) {
                     $query->where('order_info_id', 'like', "%{$request->order_id}%");
                 })
-
                 ->when($request->filled('cus_phone'), function ($query) use ($request) {
                     $query->whereHas('customer', function ($q) use ($request) {
                         $q->where('phone', 'like', "%{$request->cus_phone}%");
                     });
                 })
-
                 ->when($request->filled('order_status'), function ($query) use ($request) {
                     $query->where('status', $request->order_status);
-                })
-                ->when($request->filled('order_payment_status'), function ($query) use ($request) {
-                    $query->where('payment_status', $request->order_payment_status);
                 })->get();
 
-            $total_amount = $calculate_orders->sum('grand_total');
+            $total_paid = $calculate_orders->sum('total_paid');
+            $total_due = $calculate_orders->sum('due_amount');
 
-            $orders = OrderInfo::with('orders.product', 'customer', 'handler', 'remarker')
-
-                ->when($request->filled(['start_date', 'end_date']), function ($query) use ($request) {
-                    $query->whereDate('place_date', '>=', $request->start_date)
-                            ->whereDate('place_date', '<=', $request->end_date);
-                })
-
+            $orders = OrderInfo::with([
+                'orders.product',
+                'customer',
+                'handler',
+                'remarker',
+                'due_payments' => function ($query) {
+                    $query->whereDate('due_paid_date', '<=', request('end_date'));
+                },
+            ])
+                ->when(
+                    $request->filled(['start_date', 'end_date']),
+                    function ($query) use ($request) {
+                        $query->where(function ($q) use ($request) {
+                            $q->whereBetween('place_date', [
+                                $request->start_date,
+                                $request->end_date,
+                            ])
+                                ->orWhereHas('due_payments', function ($dueQuery) use ($request) {
+                                    $dueQuery->whereDate(
+                                        'due_paid_date',
+                                        '>=',
+                                        $request->start_date
+                                    )
+                                        ->whereDate(
+                                            'due_paid_date',
+                                            '<=',
+                                            $request->end_date
+                                        );
+                                });
+                        });
+                    }
+                )
                 ->when($request->filled('order_id'), function ($query) use ($request) {
                     $query->where('order_info_id', 'like', "%{$request->order_id}%");
                 })
-
                 ->when($request->filled('cus_phone'), function ($query) use ($request) {
                     $query->whereHas('customer', function ($q) use ($request) {
                         $q->where('phone', 'like', "%{$request->cus_phone}%");
                     });
                 })
-
                 ->when($request->filled('order_status'), function ($query) use ($request) {
                     $query->where('status', $request->order_status);
-                })
-                ->when($request->filled('order_payment_status'), function ($query) use ($request) {
-                    $query->where('payment_status', $request->order_payment_status);
                 })
 
                 ->orderByDesc('created_at')
@@ -116,7 +160,8 @@ class OrderController extends Controller
                 'data' =>
                 [
                     'orders' => $orders,
-                    'total_amount' => $total_amount
+                    'total_paid' => $total_paid,
+                    'total_due' => $total_due,
                 ],
             ]);
         } catch (Exception $e) {
@@ -294,6 +339,8 @@ class OrderController extends Controller
     public function details($id)
     {
         try {
+
+            $payment_vias = paymentVia();
             $order = OrderInfo::with(['orders.product', 'customer', 'handler', 'remarker'])
                 ->where('id', $id)
                 ->first();
@@ -301,7 +348,10 @@ class OrderController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Data retrieved successfully.',
-                'data' => $order,
+                'data' => [
+                    'order' => $order,
+                    'payment_vias' => $payment_vias
+                ]
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -398,7 +448,7 @@ class OrderController extends Controller
 
             $order->status = request('status');
 
-            $order->handler_id = Auth::guard('api')->id();
+            // $order->handler_id = Auth::guard('api')->id();
 
             $order->save();
 
@@ -440,7 +490,7 @@ class OrderController extends Controller
 
             $order = OrderInfo::find($id);
             $order->remark = request('remark');
-            $order->remark_by = Auth::guard('api')->id();
+            // $order->remark_by = Auth::guard('api')->id();
 
             $order->save();
 
@@ -675,7 +725,7 @@ class OrderController extends Controller
             $subtotal += $order->total_item_price;
         }
 
-        $subtotal = round($subtotal, 2) ;
+        $subtotal = round($subtotal, 2);
 
         $grand_total = round($subtotal + $order_info->delivery_fee, 2);
 
@@ -926,37 +976,246 @@ class OrderController extends Controller
         ]);
     }
 
-    public function dueReportPrint(OrderInfo $order)
+    public function dueReportPrint($id)
     {
-        $order->load(['orders.productPrice.product', 'campaign.campaign', 'branch.users', 'customer', 'seller']);
 
-        $pdf = Pdf::loadView('pdf.due-report', compact('order'))
-            ->setPaper([0, 0, 380, 600]);
+        $order = OrderInfo::with(['customer', 'due_payments' => function ($query) {
+            $query->when(request()->filled('end_date'), function ($q1) {
+                $q1->whereDate('due_paid_date', '<=', request('end_date'));
+            });
+        }])
+            ->when(request()->filled('customer_id'), function ($query) {
+                $query->whereHas('customer', function ($q) {
+                    $q->where('id', request('customer_id'));
+                });
+            })
+            ->whereColumn('init_pay', '!=', 'grand_total')
+            ->when(request()->filled('invoice'), function ($q) {
+                $q->where('invoice', 'like', '%' . request('invoice') . '%');
+            })
+            ->when(request()->filled('start_date') && request()->filled('end_date'), function ($q2) {
+                $q2->where(function ($query) {
+                    $query->whereBetween('place_date', [
+                        request('start_date'),
+                        request('end_date')
+                    ])->orWhereHas('due_payments', function ($q) {
+                        $q->whereDate('due_paid_date', '>=', request('start_date'))->whereDate('due_paid_date', '<=', request('end_date'));
+                    });
+                });
+            })
+            ->where('id', $id)
+            ->where('status', request('order_status'))
+            ->first();
 
-        return response($pdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="due-report.pdf"',
+
+        $html = view('pdf.due-report', compact('order'))->render();
+
+        $tempDir = public_path('assets/fonts');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $fontDirs = (new ConfigVariables())->getDefaults()['fontDir'];
+        $fontData = (new FontVariables())->getDefaults()['fontdata'];
+
+        $solaiman = [
+            'R'      => 'SolaimanLipi.ttf',
+            'useOTL' => 0xFF, // required for Bengali shaping
+        ];
+
+        // Only if you added the bold file
+        if (file_exists(public_path('assets/fonts/SolaimanLipi_Bold.ttf'))) {
+            $solaiman['B'] = 'SolaimanLipi_Bold.ttf';
+        }
+
+        $mpdf = new Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+
+            'tempDir'      => $tempDir,
+            'fontDir'      => array_merge($fontDirs, [public_path('assets/fonts')]),
+            'fontdata'     => $fontData + ['solaimanlipi' => $solaiman],
+            'default_font' => 'solaimanlipi',
+        ]);
+
+        $mpdf->WriteHTML($html);
+
+        $content = $mpdf->Output('', Destination::STRING_RETURN);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="product_sale_report.pdf"',
+            'Content-Length'      => strlen($content),
         ]);
     }
-    public function saleInvoiceReport(OrderInfo $order)
+    public function ordersDueReportPrint()
     {
-        $order->load(['orders.productPrice.product', 'campaign.campaign', 'branch.users', 'customer', 'seller']);
 
-        $pdf = Pdf::loadView('pdf.sale-report', compact('order'))
-            ->setPaper([0, 0, 380, 600]);
+        $orders = OrderInfo::with(['customer', 'due_payments' => function ($query) {
+            $query->when(request()->filled('end_date'), function ($q1) {
+                $q1->whereDate('due_paid_date', '<=', request('end_date'));
+            });
+        }])
+            ->when(request()->filled('customer_id'), function ($query) {
+                $query->whereHas('customer', function ($q) {
+                    $q->where('id', request('customer_id'));
+                });
+            })
+            ->whereColumn('init_pay', '!=', 'grand_total')
+            ->when(request()->filled('invoice'), function ($q) {
+                $q->where('invoice', 'like', '%' . request('invoice') . '%');
+            })
+            ->when(request()->filled('start_date') && request()->filled('end_date'), function ($q2) {
+                $q2->where(function ($query) {
+                    $query->whereBetween('place_date', [
+                        request('start_date'),
+                        request('end_date')
+                    ])->orWhereHas('due_payments', function ($q) {
+                        $q->whereDate('due_paid_date', '>=', request('start_date'))->whereDate('due_paid_date', '<=', request('end_date'));
+                    });
+                });
+            })
+            ->where('status', request('order_status'))
+            ->get();
 
-        return response($pdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="sale-invoice-report.pdf"',
+        $total_due_paid = $orders->sum('due_paid_amount');
+        $total_due_remaining = $orders->sum('due_amount');
+
+        $html = view('pdf.orders-due-report', compact('orders', 'total_due_paid', 'total_due_remaining'))->render();
+
+        $tempDir = public_path('assets/fonts');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $fontDirs = (new ConfigVariables())->getDefaults()['fontDir'];
+        $fontData = (new FontVariables())->getDefaults()['fontdata'];
+
+        $solaiman = [
+            'R'      => 'SolaimanLipi.ttf',
+            'useOTL' => 0xFF,
+        ];
+
+        if (file_exists(public_path('assets/fonts/SolaimanLipi_Bold.ttf'))) {
+            $solaiman['B'] = 'SolaimanLipi_Bold.ttf';
+        }
+
+        $mpdf = new Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+            'tempDir'      => $tempDir,
+            'fontDir'      => array_merge($fontDirs, [public_path('assets/fonts')]),
+            'fontdata'     => $fontData + ['solaimanlipi' => $solaiman],
+            'default_font' => 'solaimanlipi',
+        ]);
+
+        $mpdf->WriteHTML($html);
+
+        $content = $mpdf->Output('', Destination::STRING_RETURN);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="product_sale_report.pdf"',
+            'Content-Length'      => strlen($content),
+        ]);
+    }
+    public function saleInvoiceReport($id)
+    {
+        $request = request();
+        $order = OrderInfo::with([
+            'orders.product',
+            'customer',
+            'handler',
+            'remarker',
+            'due_payments' => function ($query) {
+                $query->whereDate('due_paid_date', '<=', request('end_date'));
+            },
+        ])
+            ->when(
+                $request->filled(['start_date', 'end_date']),
+                function ($query) use ($request) {
+                    $query->where(function ($q) use ($request) {
+                        $q->whereBetween('place_date', [
+                            $request->start_date,
+                            $request->end_date,
+                        ])
+                            ->orWhereHas('due_payments', function ($dueQuery) use ($request) {
+                                $dueQuery->whereDate(
+                                    'due_paid_date',
+                                    '>=',
+                                    $request->start_date
+                                )
+                                    ->whereDate(
+                                        'due_paid_date',
+                                        '<=',
+                                        $request->end_date
+                                    );
+                            });
+                    });
+                }
+            )
+            ->when($request->filled('order_id'), function ($query) use ($request) {
+                $query->where('order_info_id', 'like', "%{$request->order_id}%");
+            })
+            ->when($request->filled('cus_phone'), function ($query) use ($request) {
+                $query->whereHas('customer', function ($q) use ($request) {
+                    $q->where('phone', 'like', "%{$request->cus_phone}%");
+                });
+            })
+            ->when($request->filled('order_status'), function ($query) use ($request) {
+                $query->where('status', $request->order_status);
+            })
+            ->where('id', $id)->first();
+
+
+        $html = view('pdf.sale-report', compact('order'))->render();
+
+        $tempDir = public_path('assets/fonts');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $fontDirs = (new ConfigVariables())->getDefaults()['fontDir'];
+        $fontData = (new FontVariables())->getDefaults()['fontdata'];
+
+        $solaiman = [
+            'R'      => 'SolaimanLipi.ttf',
+            'useOTL' => 0xFF, // required for Bengali shaping
+        ];
+
+        // Only if you added the bold file
+        if (file_exists(public_path('assets/fonts/SolaimanLipi_Bold.ttf'))) {
+            $solaiman['B'] = 'SolaimanLipi_Bold.ttf';
+        }
+
+        $mpdf = new Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+
+            'tempDir'      => $tempDir,
+            'fontDir'      => array_merge($fontDirs, [public_path('assets/fonts')]),
+            'fontdata'     => $fontData + ['solaimanlipi' => $solaiman],
+            'default_font' => 'solaimanlipi',
+        ]);
+
+        $mpdf->WriteHTML($html);
+
+        $content = $mpdf->Output('', Destination::STRING_RETURN);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="product_sale_report.pdf"',
+            'Content-Length'      => strlen($content),
         ]);
     }
 
     public function soldProduct()
     {
         try {
+
             $all_products = OrderDetails::with(['product', 'order_info', 'order_info.customer', 'order_info.handler'])
                 ->whereHas('order_info', function ($q) {
-                    $q->where('status', 2);
+                    $q->whereIn('status', [2, 3]);
                 })
                 ->when(request()->filled('product_id'), function ($query) {
                     $query->where('product_info_id', request('product_id'));
@@ -964,7 +1223,6 @@ class OrderController extends Controller
                 ->when(
                     request()->filled('start_date') &&
                         request()->filled('end_date'),
-
                     function ($q) {
                         $q->whereHas('order_info', function ($q2) {
                             $q2->whereDate('place_date', '>=', request('start_date'))
@@ -979,7 +1237,7 @@ class OrderController extends Controller
 
             $products = OrderDetails::with(['product', 'order_info', 'order_info.customer', 'order_info.handler'])
                 ->whereHas('order_info', function ($q) {
-                    $q->where('status', 2);
+                    $q->whereIn('status', [2, 3]);
                 })
                 ->when(request()->filled('product_id'), function ($query) {
                     $query->where('product_info_id', request('product_id'));
@@ -1014,7 +1272,7 @@ class OrderController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
@@ -1043,52 +1301,67 @@ class OrderController extends Controller
     {
         try {
 
-            // $orders = DuePayment::with(['order.customer', 'order.branch', 'due_paid_via'])
-
-            //     ->whereHas('order', function ($query) {
-            //         $query->when(request()->filled('search'), function ($q) {
-            //                 $q->where('invoice', 'like', '%' . request('search') . '%')
-            //                 ->whereHas('order.customer', function ($q2) {
-            //                     $q2->where('phone', 'like', '%' . request('search') . '%');
-            //                 })
-            //                 ;
-            //             });
-            //     })
-            //     ->whereDate('due_paid_date', '>=', request('start_date'))
-            //     ->whereDate('due_paid_date', '<=', request('end_date'))
-            //     ->paginate(10);
-            $orders = OrderInfo::with(['customer', 'branch',  'due_payments' => function ($query) {
-                $query->whereDate('due_paid_date', '>=', request('start_date'))
-                    ->whereDate('due_paid_date', '<=', request('end_date'))
-                    ->with('due_paid_via');
-            },])
-                ->whereHas('due_payments', function ($query) {
-                    $query->whereDate('due_paid_date', '>=', request('start_date'))
-                        ->whereDate('due_paid_date', '<=', request('end_date'));
-                })
+            $calc_orders = OrderInfo::with(['customer', 'due_payments' => function ($query) {
+                $query
+                    ->whereDate('due_paid_date', '<=', request('end_date'));
+            }])
                 ->when(request()->filled('customer_id'), function ($query) {
                     $query->whereHas('customer', function ($q) {
                         $q->where('id', request('customer_id'));
                     });
                 })
-                ->where('payment_status', 'completed')
+                ->whereColumn('init_pay', '!=', 'grand_total')
+                ->when(request()->filled('invoice'), function ($q) {
+                    $q->where('invoice', 'like', '%' . request('invoice') . '%');
+                })
                 ->where(function ($query) {
-                    $query->when(request()->filled('search'), function ($q) {
-                        $q->where('invoice', 'like', '%' . request('search') . '%')
-                            ->orWhereHas('customer', function ($q2) {
-                                $q2->where('phone', 'like', '%' . request('search') . '%');
-                            });
+                    $query->whereBetween('place_date', [
+                        request('start_date'),
+                        request('end_date')
+                    ])->orWhereHas('due_payments', function ($q) {
+                        $q->whereDate('due_paid_date', '>=', request('start_date'))->whereDate('due_paid_date', '<=', request('end_date'));
                     });
                 })
-                ->whereColumn('init_pay', '!=', 'payable_price')
-                ->whereDate('place_date', '>=', request('start_date'))
-                ->whereDate('place_date', '<=', request('end_date'))
+                ->where('status', request('order_status'))
+                ->get();
+
+            $total_due_paid = $calc_orders->sum('due_paid_amount');
+            $total_due_remaining = $calc_orders->sum('due_amount');
+
+            $orders = OrderInfo::with(['customer', 'due_payments' => function ($query) {
+                $query
+                    ->whereDate('due_paid_date', '<=', request('end_date'));
+            }])
+                ->when(request()->filled('customer_id'), function ($query) {
+                    $query->whereHas('customer', function ($q) {
+                        $q->where('id', request('customer_id'));
+                    });
+                })
+                ->whereColumn('init_pay', '!=', 'grand_total')
+                ->when(request()->filled('invoice'), function ($q) {
+                    $q->where('invoice', 'like', '%' . request('invoice') . '%');
+                })
+                ->where(function ($query) {
+                    $query->whereBetween('place_date', [
+                        request('start_date'),
+                        request('end_date')
+                    ])->orWhereHas('due_payments', function ($q) {
+                        $q->whereDate('due_paid_date', '>=', request('start_date'))->whereDate('due_paid_date', '<=', request('end_date'));
+                    });
+                })
+                ->where('status', request('order_status'))
+                ->latest()
                 ->paginate(10);
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data retrieved successfully.',
-                'data' => $orders,
+                'data' => 
+                [
+                    'orders' => $orders,
+                    'total_due_paid' => $total_due_paid,
+                    'total_due_remaining' => $total_due_remaining
+                ]
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -1101,21 +1374,20 @@ class OrderController extends Controller
     {
         try {
 
-            // $order = OrderInfo::with(['orders.productPrice.product', 'customer', 'branch', 'due_payment_via'])
-            //     ->where('payment_status', 'completed')
-            //     // ->where('due', '>', 0)
-            //     ->find($id);
+            $order = OrderInfo::with(['orders.product', 'customer'])
 
-            // $payment_vias = PaymentVia::where('is_active', 1)->get();
+                ->find($id);
 
-            // return response()->json([
-            //     'status' => true,
-            //     'message' => 'Data retrieved successfully.',
-            //     'data' => [
-            //         'order' => $order,
-            //         'payment_vias' => $payment_vias,
-            //     ],
-            // ]);
+            $payment_vias = paymentVia();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data retrieved successfully.',
+                'data' => [
+                    'order' => $order,
+                    'payment_vias' => $payment_vias,
+                ],
+            ]);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'Something went wrong!',
@@ -1129,12 +1401,11 @@ class OrderController extends Controller
 
             $order = OrderInfo::find($id);
 
-            $order->due_payments()->updateOrCreate(
-                ['due_paid_date' => $request->due_paid_date],
+            $order->due_payments()->create(
                 [
                     'due_paid_amount' => $request->due_paid_amount,
                     'due_paid_date' => $request->due_paid_date,
-                    'due_payment_via_id' => $request->payment_method,
+                    'pay_via' => $request->payment_method,
                     'remark' => $request->remark,
                 ]
             );
@@ -1147,6 +1418,64 @@ class OrderController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'Something went wrong',
+            ], 500);
+        }
+    }
+
+    public function duePayEdit($id)
+    {
+        try {
+            $due_payment = DuePayment::find($id);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data retrieved successfully.',
+                'data' => $due_payment,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
+            ], 500);
+        }
+    }
+
+    public function duePayUpdate($id, Request $request)
+    {
+        try {
+            $due_payment = DuePayment::find($id);
+
+            $due_payment->due_paid_amount = $request->due_paid_amount;
+            $due_payment->due_paid_date = $request->due_paid_date;
+            $due_payment->pay_via = $request->payment_method;
+            $due_payment->remark = $request->remark;
+            $due_payment->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data updated successfully.',
+                'data' => $due_payment,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
+            ], 500);
+        }
+    }
+
+    public function duePayDestroy($id)
+    {
+        try {
+            $duePayment = DuePayment::findOrFail($id);
+            $duePayment->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data deleted successfully.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
@@ -1198,7 +1527,7 @@ class OrderController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
@@ -1307,7 +1636,7 @@ class OrderController extends Controller
 
     public function discountReportPrint(OrderInfo $order)
     {
-        $order->load(['orders.productPrice.product', 'campaign.campaign', 'branch.users', 'customer', 'seller']);
+        $order->load(['orders.product', 'customer', 'seller']);
 
         $pdf = Pdf::loadView('pdf.due-report', compact('order'))
             ->setPaper([0, 0, 380, 600]);
@@ -1381,7 +1710,7 @@ class OrderController extends Controller
                 }
             }
 
-            if($order_id){
+            if ($order_id) {
                 $this->amountSet($order_id);
             }
 
@@ -1392,7 +1721,7 @@ class OrderController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
@@ -1415,9 +1744,31 @@ class OrderController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }
-            
+
+    public function saveAdvPay(Request $request, $id)
+    {
+        try {
+            $order = OrderInfo::find($id);
+
+            if (!empty($order)) {
+                $order->init_pay = $request->adv_paid_amount;
+                $order->pay_via = $request->payment_method;
+                $order->save();
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Payment saved.',
+                'data' => [],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'Something went wrong!',
+            ], 500);
+        }
+    }
 }

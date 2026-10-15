@@ -52,7 +52,7 @@ class FrontendController extends Controller
             ]);
         } catch (Exception $e) {
             return response()->json([
-                'status' => $e->getMessage(),
+                'status' => 'Something went wrong!',
             ], 500);
         }
     }

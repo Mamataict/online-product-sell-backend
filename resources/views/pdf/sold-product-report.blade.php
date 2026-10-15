@@ -170,7 +170,6 @@
                 <th width="5%">SL.</th>
                 <th width="11%">Date</th>
                 <th width="11%">Invoice</th>
-                <th width="12%">Payment Status</th>
                 <th width="24%">Customer</th>
                 <th width="9%">Qty</th>
                 <th width="12%">Amount</th>
@@ -193,8 +192,6 @@
 
                         <td class="center">{{ $product->order_info?->order_info_id }}</td>
 
-                        <td class="center">{{ $product->order_info?->payment_status_text }}</td>
-
                         <td class="center">
                             {{ $product->order_info?->customer?->name }}
                             @if ($product->order_info?->customer?->phone)
@@ -213,7 +210,7 @@
                 
 
                 <tr class="totals-row">
-                    <td colspan="5" class="num">Total</td>
+                    <td colspan="4" class="num">Total</td>
                     <td class="num">{{ number_format($total_qty, 2) }}</td>
                     <td class="num">{{ number_format($total_price, 2) }}</td>
                     <td></td>

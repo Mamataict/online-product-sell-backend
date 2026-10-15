@@ -67,7 +67,7 @@ class DeliveryFeeController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Something went wrong!',
             ], 500);
         }
     }
@@ -88,7 +88,7 @@ class DeliveryFeeController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Something went wrong!',
             ], 500);
         }
     }

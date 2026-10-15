@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Order;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order\OrderDetails;
+use App\Models\Order\OrderInfo;
 use App\Models\Product\ProductInfo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -59,7 +60,7 @@ class ReportController extends Controller
     {
         $products = OrderDetails::with(['product', 'order_info', 'order_info.customer', 'order_info.handler'])
             ->whereHas('order_info', function ($q) {
-                $q->where('status', 2);
+                $q->whereIn('status', [2, 3]);
             })
             ->when(request()->filled('product_id'), function ($query) {
                 $query->where('product_info_id', request('product_id'));
@@ -133,5 +134,105 @@ class ReportController extends Controller
         //     'Content-Type' => 'application/pdf',
         //     'Content-Disposition' => 'inline; filename="sold-product-report.pdf"',
         // ]);
+    }
+
+    public function salesReport()
+    {
+
+        $request = request();
+
+        $total_paid = 0;
+        $total_due = 0;
+
+        $orders = OrderInfo::with([
+            'orders.product',
+            'customer',
+            'handler',
+            'remarker',
+            'due_payments' => function ($query) {
+                $query->whereDate('due_paid_date', '<=', request('end_date'));
+            },
+        ])
+            ->when(
+                    $request->filled(['start_date', 'end_date']),
+                    function ($query) use ($request) {
+                        $query->where(function ($q) use ($request) {
+                            $q->whereBetween('place_date', [
+                                $request->start_date,
+                                $request->end_date,
+                            ])
+                                ->orWhereHas('due_payments', function ($dueQuery) use ($request) {
+                                    $dueQuery->whereDate(
+                                        'due_paid_date',
+                                        '>=',
+                                        $request->start_date
+                                    )
+                                        ->whereDate(
+                                            'due_paid_date',
+                                            '<=',
+                                            $request->end_date
+                                        );
+                                });
+                        });
+                    }
+                )
+            ->when($request->filled('order_id'), function ($query) use ($request) {
+                $query->where('order_info_id', 'like', "%{$request->order_id}%");
+            })
+            ->when($request->filled('cus_phone'), function ($query) use ($request) {
+                $query->whereHas('customer', function ($q) use ($request) {
+                    $q->where('phone', 'like', "%{$request->cus_phone}%");
+                });
+            })
+            ->when($request->filled('order_status'), function ($query) use ($request) {
+                $query->where('status', $request->order_status);
+            })->get();
+
+        $total_paid = $orders->sum('total_paid');
+        $total_due = $orders->sum('due_amount');
+
+        // Generate PDF
+
+
+        $html = view('pdf.sales-report', compact('orders', 'total_paid', 'total_due'))->render();
+
+        $tempDir = public_path('assets/fonts');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $fontDirs = (new ConfigVariables())->getDefaults()['fontDir'];
+        $fontData = (new FontVariables())->getDefaults()['fontdata'];
+
+        $solaiman = [
+            'R'      => 'SolaimanLipi.ttf',
+            'useOTL' => 0xFF, // required for Bengali shaping
+        ];
+
+        // Only if you added the bold file
+        if (file_exists(public_path('assets/fonts/SolaimanLipi_Bold.ttf'))) {
+            $solaiman['B'] = 'SolaimanLipi_Bold.ttf';
+        }
+
+        $mpdf = new Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+
+            'tempDir'      => $tempDir,
+            'fontDir'      => array_merge($fontDirs, [public_path('assets/fonts')]),
+            'fontdata'     => $fontData + ['solaimanlipi' => $solaiman],
+            'default_font' => 'solaimanlipi',
+        ]);
+
+        $mpdf->WriteHTML($html);
+
+        $content = $mpdf->Output('', Destination::STRING_RETURN);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="product_sale_report.pdf"',
+            'Content-Length'      => strlen($content),
+        ]);
+
     }
 }
